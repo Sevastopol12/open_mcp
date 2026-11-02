@@ -1,3 +1,4 @@
+import json
 from collections.abc import AsyncIterator
 
 from pydantic import ValidationError
@@ -67,25 +68,113 @@ class OpencodeRuntime:
         return interrupted
 
     async def list_skills(self) -> list[SkillInfo]:
-        raise self._unsupported("list_skills", "G5")
+        payload = await self._client.get(paths.SKILLS)
+        items = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(items, list):
+            raise RuntimeResponseError("The skill list had an unexpected shape")
+        try:
+            return [
+                SkillInfo.model_validate(
+                    {**item, "description": item.get("description", "")}
+                )
+                for item in items
+            ]
+        except (TypeError, ValidationError) as exc:
+            raise RuntimeResponseError(
+                "Some skills did not match the expected schema"
+            ) from exc
 
     async def start(self, task: Task, prompt: str) -> str:
-        raise self._unsupported("start", "G4, G6")
+        workspace = task.workspace
+        if workspace is None:
+            raise RuntimeResponseError("A workspace is required to start a session")
+        payload = await self._client.post(
+            paths.session_create(),
+            json={
+                "title": task.spec.title,
+                "model": {
+                    "providerID": task.spec.model.provider_id,
+                    "id": task.spec.model.model_id,
+                },
+                "location": {"directory": workspace.ref},
+                "permissions": [],
+            },
+        )
+        body = payload.get("data") if isinstance(payload, dict) else None
+        session_id = body.get("id") if isinstance(body, dict) else None
+        if not isinstance(session_id, str) or not session_id:
+            raise RuntimeResponseError(
+                "The session create response had an unexpected shape"
+            )
+        await self.send(session_id, prompt)
+        return session_id
 
     async def status(self, session_id: str) -> RuntimeStatus:
-        raise self._unsupported("status", "G3, G4")
+        active = await self._client.get(paths.ACTIVE_SESSIONS)
+        data = active.get("data") if isinstance(active, dict) else None
+        if not isinstance(data, dict):
+            raise RuntimeResponseError(
+                "The active session response had an unexpected shape"
+            )
+        if session_id in data:
+            return RuntimeStatus.BUSY
+        session = await self._client.get(paths.session_get(session_id))
+        body = session.get("data") if isinstance(session, dict) else None
+        if not isinstance(body, dict):
+            raise RuntimeResponseError("The session response had an unexpected shape")
+        return (
+            RuntimeStatus.FAILED
+            if body.get("outcome") == "failed"
+            else RuntimeStatus.IDLE
+        )
 
     async def events(self, session_id: str) -> AsyncIterator[TaskEvent]:
-        raise self._unsupported("events", "G3")
-        yield
+        async for frame in self._client.stream_sse(
+            paths.session_log(session_id), params={"follow": "true"}
+        ):
+            event = frame.get("event")
+            raw_data = frame.get("data")
+            try:
+                data = json.loads(raw_data) if raw_data is not None else None
+            except ValueError as exc:
+                raise RuntimeResponseError(
+                    "The session event data was not valid JSON"
+                ) from exc
+            if not isinstance(event, str) or not isinstance(data, dict):
+                raise RuntimeResponseError("The session event had an unexpected shape")
+            kind = data.get("type", event)
+            if not isinstance(kind, str):
+                raise RuntimeResponseError("The session event type was unexpected")
+            yield TaskEvent(kind=kind, data=data)
 
     async def pending_permissions(self, session_id: str) -> list[PermissionRequest]:
-        raise self._unsupported("pending_permissions", "G2")
+        payload = await self._client.get(paths.session_permissions(session_id))
+        items = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(items, list):
+            raise RuntimeResponseError("The permission list had an unexpected shape")
+        try:
+            return [
+                PermissionRequest(
+                    id=item["id"],
+                    session_id=item["sessionID"],
+                    kind=item["action"],
+                    targets=item.get("resources", []),
+                    detail=item.get("message", ""),
+                )
+                for item in items
+            ]
+        except (KeyError, TypeError, ValidationError) as exc:
+            raise RuntimeResponseError(
+                "A permission request had an unexpected shape"
+            ) from exc
 
     async def reply_permission(
         self, session_id: str, request_id: str, *, allow: bool
     ) -> None:
-        raise self._unsupported("reply_permission", "G2")
+        await self._client.post(
+            paths.session_permission_reply(session_id, request_id),
+            json={"decision": "once" if allow else "reject"},
+        )
 
     @staticmethod
     def _unsupported(operation: str, gaps: str) -> RuntimeCapabilityError:

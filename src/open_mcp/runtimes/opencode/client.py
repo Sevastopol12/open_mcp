@@ -93,6 +93,36 @@ class OpencodeClient:
     async def delete(self, path: str, **kwargs: Any) -> Any:
         return await self.request("DELETE", path, **kwargs)
 
+    async def stream_sse(
+        self, path: str, *, params: Mapping[str, Any] | None = None
+    ):
+        try:
+            async with self._http.stream("GET", path, params=params) as response:
+                if not 200 <= response.status_code < 300:
+                    await response.aread()
+                    self._parse("GET", path, response)
+                event: dict[str, str] = {}
+                async for line in response.aiter_lines():
+                    if not line:
+                        if "data" in event:
+                            yield event
+                        event = {}
+                        continue
+                    if line.startswith(":"):
+                        continue
+                    key, separator, value = line.partition(":")
+                    if separator:
+                        event[key] = value.lstrip()
+        except httpx2.TimeoutException as exc:
+            raise RuntimeTimeoutError(
+                "The opencode server timed out",
+                details={"method": "GET", "path": path},
+            ) from exc
+        except httpx2.TransportError as exc:
+            raise self._unavailable(
+                "The opencode server connection failed", "GET", path
+            ) from exc
+
     def _timeout(self, read_seconds: float) -> httpx2.Timeout:
         return httpx2.Timeout(
             read_seconds, connect=self._settings.connect_timeout_seconds
