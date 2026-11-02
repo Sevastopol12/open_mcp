@@ -4,7 +4,6 @@ from collections.abc import AsyncIterator
 from pydantic import ValidationError
 
 from open_mcp.contracts.errors import (
-    RuntimeCapabilityError,
     RuntimeResponseError,
     RuntimeTimeoutError,
 )
@@ -124,7 +123,7 @@ class OpencodeRuntime:
             raise RuntimeResponseError("The session response had an unexpected shape")
         return (
             RuntimeStatus.FAILED
-            if body.get("outcome") == "failed"
+            if body.get("outcome") in {"failed", "interrupted"}
             else RuntimeStatus.IDLE
         )
 
@@ -174,11 +173,4 @@ class OpencodeRuntime:
         await self._client.post(
             paths.session_permission_reply(session_id, request_id),
             json={"decision": "once" if allow else "reject"},
-        )
-
-    @staticmethod
-    def _unsupported(operation: str, gaps: str) -> RuntimeCapabilityError:
-        return RuntimeCapabilityError(
-            f"{operation} is not implemented yet (opencode contract gaps)",
-            details={"operation": operation, "gaps": gaps},
         )
