@@ -93,9 +93,7 @@ class OpencodeClient:
     async def delete(self, path: str, **kwargs: Any) -> Any:
         return await self.request("DELETE", path, **kwargs)
 
-    async def stream_sse(
-        self, path: str, *, params: Mapping[str, Any] | None = None
-    ):
+    async def stream_sse(self, path: str, *, params: Mapping[str, Any] | None = None):
         try:
             async with self._http.stream("GET", path, params=params) as response:
                 if not 200 <= response.status_code < 300:
