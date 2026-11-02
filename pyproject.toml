@@ -1,7 +1,7 @@
 [project]
 name = "open-mcp"
 version = "0.1.0"
-description = "Add your description here"
+description = "MCP server that lets a main AI agent delegate build tasks to sub-agents (opencode first)."
 readme = "README.md"
 authors = [
     { name = "Sevastopol12", email = "chkalov253@gmail.com" }
@@ -11,17 +11,40 @@ dependencies = [
     "fastmcp>=4.1.4",
     "httpx2>=2.16.0",
     "mcp>=2.3.0",
-    "ruff>=0.17.3",
+    "pydantic>=2",
+    "python-dotenv>=1.0",
+    "uvicorn>=0.54.0",
 ]
 
 [project.scripts]
-open-mcp = "open_mcp:main"
+open-mcp = "open_mcp.server:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "anyio>=4",
+    "ruff>=0.17.3",
+]
 
 [build-system]
 requires = ["uv_build>=0.12.24,<0.13.0"]
 build-backend = "uv_build"
 
-[tool.uv.workspace]
-members = [
-    "0",
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+extend-exclude = ["drafts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ASYNC221", "ASYNC240"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "opencode: needs a running opencode server (skipped by default)",
 ]
+addopts = "-m 'not opencode'"
