@@ -1,6 +1,6 @@
-from typing import Annotated, Self
+from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from open_mcp.contracts import (
     MergeOutcome,
@@ -106,7 +106,7 @@ class SkillSummary(BaseModel):
 
     id: str
     name: str
-    description: Annotated[str, Field(max_length=500)]
+    description: str
 
     @classmethod
     def of(cls, skill: SkillInfo) -> Self:
