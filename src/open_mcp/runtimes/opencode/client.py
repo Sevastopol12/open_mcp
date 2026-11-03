@@ -14,9 +14,6 @@ from open_mcp.contracts.errors import (
 )
 from open_mcp.settings import Settings
 
-RETRYABLE_ERRORS = (httpx2.ConnectError, httpx2.ConnectTimeout)
-BODY_SNIPPET_CHARS = 300
-
 
 class OpencodeClient:
     def __init__(
@@ -59,7 +56,7 @@ class OpencodeClient:
         while True:
             try:
                 response = await self._http.request(method, path, **options)
-            except RETRYABLE_ERRORS as exc:
+            except (httpx2.ConnectError, httpx2.ConnectTimeout) as exc:
                 if attempt >= self._settings.connect_retries:
                     raise self._unavailable(
                         "Could not connect to the opencode server", method, path
@@ -155,7 +152,8 @@ class OpencodeClient:
                     "The opencode server returned a body that is not valid JSON",
                     details=details,
                 ) from exc
-        details["body"] = response.text[:BODY_SNIPPET_CHARS]
+
+        details["body"] = response.text
         if status in (401, 403):
             raise RuntimeAuthError(
                 "The opencode server rejected the credentials", details=details
