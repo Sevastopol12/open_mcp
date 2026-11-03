@@ -1,6 +1,4 @@
-import json
 import os
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated, Self
 
@@ -29,6 +27,7 @@ class Settings(BaseModel):
     server_port: Annotated[int, Field(ge=1, le=65535)]
     cors_allow_origins: tuple[str, ...] = ()
     workspace_roots: tuple[Path, ...] = ()
+    permission_poll_seconds: Annotated[float, Field(gt=0)] = 0.5
     max_parallel_tasks: Annotated[int, Field(ge=1, le=32)] = 3
     connect_timeout_seconds: Annotated[float, Field(gt=0)] = 5.0
     request_timeout_seconds: Annotated[float, Field(gt=0)] = 60.0
