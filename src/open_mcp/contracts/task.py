@@ -201,6 +201,7 @@ class TaskResult(BaseModel):
     summary: str
     diff: str
     changed_files: list[str] = Field(default_factory=list)
+    outside_owned_paths: list[str] = Field(default_factory=list)
     summary_truncated: bool = False
     diff_truncated: bool = False
 

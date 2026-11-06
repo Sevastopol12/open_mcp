@@ -39,6 +39,14 @@ class RuntimeResponseError(OpenMcpError):
     code = "runtime_bad_response"
 
 
+class InvalidRequestError(OpenMcpError):
+    code = "invalid_request"
+
+
+class ModelNotAvailableError(OpenMcpError):
+    code = "model_not_available"
+
+
 class TaskNotFoundError(OpenMcpError):
     code = "task_not_found"
 
