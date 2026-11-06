@@ -152,7 +152,6 @@ class OpencodeClient:
                     "The opencode server returned a body that is not valid JSON",
                     details=details,
                 ) from exc
-
         details["body"] = response.text
         if status in (401, 403):
             raise RuntimeAuthError(

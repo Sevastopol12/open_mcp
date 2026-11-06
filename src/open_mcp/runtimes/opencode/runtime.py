@@ -1,7 +1,7 @@
 import json
 from collections.abc import AsyncIterator
 
-from pydantic import ValidationError
+from pydantic import JsonValue, ValidationError
 
 from open_mcp.contracts.errors import (
     RuntimeResponseError,
@@ -11,6 +11,7 @@ from open_mcp.contracts.model_info import ModelInfo
 from open_mcp.contracts.runtime import PermissionRequest, RuntimeStatus
 from open_mcp.contracts.skill_info import SkillInfo
 from open_mcp.contracts.task import Task, TaskEvent
+from open_mcp.runtimes.opencode import events as log_events
 from open_mcp.runtimes.opencode import paths
 from open_mcp.runtimes.opencode.client import OpencodeClient
 
@@ -20,6 +21,7 @@ MAX_LISTED_INVALID = 500
 class OpencodeRuntime:
     def __init__(self, client: OpencodeClient) -> None:
         self._client = client
+        self._cursors: dict[str, int] = {}
 
     async def list_models(self, *, free_only: bool = True) -> list[ModelInfo]:
         payload = await self._client.get(paths.MODELS)
@@ -127,24 +129,46 @@ class OpencodeRuntime:
             else RuntimeStatus.IDLE
         )
 
-    async def events(self, session_id: str) -> AsyncIterator[TaskEvent]:
-        async for frame in self._client.stream_sse(
-            paths.session_log(session_id), params={"follow": "true"}
-        ):
-            event = frame.get("event")
-            raw_data = frame.get("data")
-            try:
-                data = json.loads(raw_data) if raw_data is not None else None
-            except ValueError as exc:
-                raise RuntimeResponseError(
-                    "The session event data was not valid JSON"
-                ) from exc
-            if not isinstance(event, str) or not isinstance(data, dict):
-                raise RuntimeResponseError("The session event had an unexpected shape")
-            kind = data.get("type", event)
-            if not isinstance(kind, str):
-                raise RuntimeResponseError("The session event type was unexpected")
-            yield TaskEvent(kind=kind, data=data)
+    async def events(
+        self, session_id: str, *, follow: bool = True
+    ) -> AsyncIterator[TaskEvent]:
+        cursor = self._cursors.get(session_id)
+        params = {"follow": "true" if follow else "false"}
+        if cursor is not None:
+            params["after"] = str(cursor)
+        try:
+            async for frame in self._client.stream_sse(
+                paths.session_log(session_id), params=params
+            ):
+                kind, data = self._parse_frame(frame)
+                sequence = log_events.event_sequence(data)
+                if sequence is not None:
+                    if cursor is not None and sequence <= cursor:
+                        continue
+                    cursor = sequence
+                    self._cursors[session_id] = sequence
+                event = log_events.normalize(kind, data)
+                yield event
+                if event.kind in log_events.TERMINAL_KINDS:
+                    return
+        except RuntimeTimeoutError:
+            return
+
+    @staticmethod
+    def _parse_frame(frame: dict[str, str]) -> tuple[str, dict[str, JsonValue]]:
+        raw_data = frame.get("data")
+        try:
+            data = json.loads(raw_data) if raw_data is not None else None
+        except ValueError as exc:
+            raise RuntimeResponseError(
+                "The session event data was not valid JSON"
+            ) from exc
+        if not isinstance(data, dict):
+            raise RuntimeResponseError("The session event had an unexpected shape")
+        kind = data.get("type", frame.get("event"))
+        if not isinstance(kind, str) or not kind:
+            raise RuntimeResponseError("The session event type was unexpected")
+        return kind, data
 
     async def pending_permissions(self, session_id: str) -> list[PermissionRequest]:
         payload = await self._client.get(paths.session_permissions(session_id))
