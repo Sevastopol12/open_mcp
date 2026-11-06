@@ -1,6 +1,8 @@
 from .errors import (
     ConfigurationError,
+    InvalidRequestError,
     InvalidTransitionError,
+    ModelNotAvailableError,
     OpenMcpError,
     RuntimeAuthError,
     RuntimeCapabilityError,
@@ -59,7 +61,9 @@ __all__ = [
     "SLOT_STATES",
     "TASK_ID_PATTERN",
     "ConfigurationError",
+    "InvalidRequestError",
     "InvalidTransitionError",
+    "ModelNotAvailableError",
     "ModelInfo",
     "ModelRef",
     "OpenMcpError",

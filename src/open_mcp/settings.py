@@ -1,5 +1,4 @@
 import os
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated, Self
 
@@ -24,7 +23,11 @@ class Settings(BaseModel):
     opencode_auth_id: str | None = None
     opencode_auth_secret: SecretStr | None = None
     context_dir: Path = Path("context")
+    server_host: Annotated[str, Field(min_length=1)]
+    server_port: Annotated[int, Field(ge=1, le=65535)]
+    cors_allow_origins: tuple[str, ...] = ()
     workspace_roots: tuple[Path, ...] = ()
+    permission_poll_seconds: Annotated[float, Field(gt=0)] = 0.5
     max_parallel_tasks: Annotated[int, Field(ge=1, le=32)] = 3
     connect_timeout_seconds: Annotated[float, Field(gt=0)] = 5.0
     request_timeout_seconds: Annotated[float, Field(gt=0)] = 60.0
@@ -37,6 +40,13 @@ class Settings(BaseModel):
     def _split_roots(cls, value: object) -> object:
         if isinstance(value, str):
             return tuple(part for part in value.split(os.pathsep) if part.strip())
+        return value
+
+    @field_validator("cors_allow_origins", mode="before")
+    @classmethod
+    def _split_origins(cls, value: object) -> object:
+        if isinstance(value, str):
+            return tuple(part.strip() for part in value.split(",") if part.strip())
         return value
 
     @field_validator("opencode_base_url")
@@ -56,14 +66,12 @@ class Settings(BaseModel):
         return self
 
     @classmethod
-    def from_env(cls, environ: Mapping[str, str] | None = None) -> Self:
-        if environ is None:
-            load_dotenv()
-            environ = os.environ
+    def from_env(cls) -> Self:
+        load_dotenv()
         values = {
-            name: environ[name.upper()]
+            name: os.environ[name.upper()]
             for name in cls.model_fields
-            if environ.get(name.upper(), "").strip()
+            if os.environ.get(name.upper(), "").strip()
         }
         try:
             return cls.model_validate(values)
