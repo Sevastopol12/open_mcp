@@ -11,6 +11,7 @@ from open_mcp.contracts import (
 )
 from open_mcp.runtimes.base import RuntimeAdapter
 from open_mcp.services import TaskService
+from open_mcp.tools.describe import describe
 from open_mcp.tools.views import (
     MergeView,
     ModelSummary,
@@ -27,6 +28,10 @@ class TaskTools:
         self._tasks = tasks
         self._runtime = runtime
 
+    @describe(
+        "List models sub-agents can use (free models by default). Call this before "
+        "delegate_task and pick provider_id and model_id from the result."
+    )
     async def available_models(
         self,
         free_only: Annotated[
@@ -36,9 +41,15 @@ class TaskTools:
         models = await self._runtime.list_models(free_only=free_only)
         return [ModelSummary.of(model) for model in models]
 
+    @describe("List skills a sub-agent can be asked to use.")
     async def available_skills(self) -> list[SkillSummary]:
         return [SkillSummary.of(skill) for skill in await self._runtime.list_skills()]
 
+    @describe(
+        "Start a sub-agent on one self-contained task in its own git worktree and "
+        "branch. Returns at once with a task id; the work continues in the "
+        "background. owned_paths must not overlap with any other active task."
+    )
     async def delegate_task(
         self,
         title: Annotated[str, Field(description="Short title, at most 120 chars.")],
@@ -89,9 +100,11 @@ class TaskTools:
             raise _invalid(exc) from exc
         return TaskView.of(await self._tasks.delegate(spec))
 
+    @describe("Get the current state of one task without waiting.")
     async def task_status(self, task_id: TaskId) -> TaskView:
         return TaskView.of(await self._tasks.status(task_id))
 
+    @describe("List tasks, optionally only those in one state.")
     async def list_tasks(
         self,
         state: Annotated[
@@ -108,6 +121,10 @@ class TaskTools:
         wanted = None if state is None else {_parse_state(state)}
         return [TaskView.of(task) for task in await self._tasks.list_tasks(wanted)]
 
+    @describe(
+        "Wait up to a bounded time for a task to leave the running state. Returns the "
+        "task either way; call again if it is still running."
+    )
     async def wait_for_task(
         self,
         task_id: TaskId,
@@ -118,9 +135,18 @@ class TaskTools:
     ) -> TaskView:
         return TaskView.of(await self._tasks.wait(task_id, timeout_seconds))
 
+    @describe(
+        "Read a finished task's summary (at most 300 lines) and its diff. Required "
+        "before merge_task. Check outside_owned_paths and the diff for mistakes and "
+        "convention drift."
+    )
     async def task_result(self, task_id: TaskId) -> ResultView:
         return ResultView.of(task_id, await self._tasks.result(task_id))
 
+    @describe(
+        "Send corrections to the same sub-agent session and run the task again. The "
+        "new result must be read with task_result before merging."
+    )
     async def request_changes(
         self,
         task_id: TaskId,
@@ -130,9 +156,16 @@ class TaskTools:
     ) -> TaskView:
         return TaskView.of(await self._tasks.request_changes(task_id, feedback))
 
+    @describe("Interrupt a running task.")
     async def cancel_task(self, task_id: TaskId) -> TaskView:
         return TaskView.of(await self._tasks.cancel(task_id))
 
+    @describe(
+        "Merge a reviewed task's branch into the repository's current branch. "
+        "Refused unless the latest result was read with task_result. If an earlier "
+        "merge moved the branch, pass allow_stale_base=true after reviewing; a "
+        "conflict is aborted and reported."
+    )
     async def merge_task(
         self,
         task_id: TaskId,
@@ -144,6 +177,7 @@ class TaskTools:
         outcome = await self._tasks.merge(task_id, allow_stale_base=allow_stale_base)
         return MergeView.of(task_id, outcome)
 
+    @describe("Throw away a task's worktree and branch without merging.")
     async def discard_task(self, task_id: TaskId) -> TaskView:
         return TaskView.of(await self._tasks.discard(task_id))
 
