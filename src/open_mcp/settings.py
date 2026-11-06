@@ -68,7 +68,11 @@ class Settings(BaseModel):
     @classmethod
     def from_env(cls) -> Self:
         load_dotenv()
-        values = {name: os.getenv(name.upper()) for name in cls.model_fields}
+        values = {
+            name: os.environ[name.upper()]
+            for name in cls.model_fields
+            if os.environ.get(name.upper(), "").strip()
+        }
         try:
             return cls.model_validate(values)
         except ValidationError as exc:
