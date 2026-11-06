@@ -41,7 +41,9 @@ class TaskService:
         self._workspace = workspace
         self._settings = settings
         self._gate = gate or PermissionGate()
-        self._watcher = EventWatcher(store, runtime, self._gate)
+        self._watcher = EventWatcher(
+            store, runtime, self._gate, poll_seconds=settings.permission_poll_seconds
+        )
         self._lock = asyncio.Lock()
         self._watchers: dict[str, asyncio.Task[None]] = {}
         self._finished: set[asyncio.Task[None]] = set()
