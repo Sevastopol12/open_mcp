@@ -1,11 +1,11 @@
 import functools
-import inspect
 from collections.abc import Awaitable, Callable
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 
 from open_mcp.contracts import OpenMcpError
+from open_mcp.tools.describe import discover
 from open_mcp.tools.errors import error_text
 from open_mcp.tools.handlers import TaskTools
 
@@ -24,7 +24,5 @@ def guarded[**P, R](
 
 
 def register_tools(mcp: FastMCP, tools: TaskTools) -> None:
-    mcp_methods = inspect.getmembers(tools, predicate=inspect.ismethodh)
-    for name, handler in mcp_methods:
-        method_description = inspect.signature(handler)
-        mcp.tool(name=name, description=method_description)(guarded(handler))
+    for name, (handler, description) in discover(tools).items():
+        mcp.tool(name=name, description=description)(guarded(handler))
