@@ -20,7 +20,6 @@ class Event:
     TERMINAL_KINDS = frozenset({SESSION_IDLE, SESSION_FAILED, SESSION_INTERRUPTED})
 
 
-
 def event_sequence(frame: dict[str, JsonValue]) -> int | None:
     durable = frame.get("durable")
     if not isinstance(durable, dict):

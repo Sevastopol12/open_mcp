@@ -24,10 +24,18 @@ class OpencodeRuntime:
         self._cursors: dict[str, int] = {}
 
     async def list_models(self, *, free_only: bool = True) -> list[ModelInfo]:
-        payload = await self._client.get(paths.MODELS)
+        payload = await self._client.get(paths.models())
         items = payload.get("data") if isinstance(payload, dict) else None
         if not isinstance(items, list):
-            raise RuntimeResponseError("The model list had an unexpected shape")
+            raise RuntimeResponseError(
+                "The model list had an unexpected shape",
+                details={
+                    "method": "GET",
+                    "path": paths.models(),
+                    "status": 500,
+                    "body": items,
+                },
+            )
         models: list[ModelInfo] = []
         invalid: list[str] = []
         for item in items:
@@ -69,10 +77,18 @@ class OpencodeRuntime:
         return interrupted
 
     async def list_skills(self) -> list[SkillInfo]:
-        payload = await self._client.get(paths.SKILLS)
+        payload = await self._client.get(paths.skills())
         items = payload.get("data") if isinstance(payload, dict) else None
         if not isinstance(items, list):
-            raise RuntimeResponseError("The skill list had an unexpected shape")
+            raise RuntimeResponseError(
+                "The skill list had an unexpected shape",
+                details={
+                    "method": "GET",
+                    "path": paths.skills(),
+                    "status": 500,
+                    "body": items,
+                },
+            )
         try:
             return [
                 SkillInfo.model_validate(
@@ -85,7 +101,7 @@ class OpencodeRuntime:
                 "Some skills did not match the expected schema"
             ) from exc
 
-    async def start(self, task: Task, prompt: str) -> str:
+    async def start(self, task: Task) -> str:
         workspace = task.workspace
         if workspace is None:
             raise RuntimeResponseError("A workspace is required to start a session")
@@ -105,13 +121,18 @@ class OpencodeRuntime:
         session_id = body.get("id") if isinstance(body, dict) else None
         if not isinstance(session_id, str) or not session_id:
             raise RuntimeResponseError(
-                "The session create response had an unexpected shape"
+                "The session create response had an unexpected shape",
+                details={
+                    "status": 500,
+                    "path": paths.session_create(),
+                    "body": body,
+                },
             )
-        await self.send(session_id, prompt)
+        await self.send(session_id, task.spec.prompt)
         return session_id
 
     async def status(self, session_id: str) -> RuntimeStatus:
-        active = await self._client.get(paths.ACTIVE_SESSIONS)
+        active = await self._client.get(paths.active_session())
         data = active.get("data") if isinstance(active, dict) else None
         if not isinstance(data, dict):
             raise RuntimeResponseError(
@@ -132,6 +153,7 @@ class OpencodeRuntime:
     async def events(
         self, session_id: str, *, follow: bool = True
     ) -> AsyncIterator[TaskEvent]:
+
         cursor = self._cursors.get(session_id)
         params = {"follow": "true" if follow else "false"}
         if cursor is not None:

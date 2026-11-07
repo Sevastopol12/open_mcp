@@ -18,7 +18,6 @@ from open_mcp.contracts.task import (
 )
 from open_mcp.runtimes.base import RuntimeAdapter
 from open_mcp.services.permissions import PermissionGate
-from open_mcp.services.prompts import build_task_prompt
 from open_mcp.services.results import shape_result
 from open_mcp.services.watcher import EventWatcher
 from open_mcp.settings import Settings
@@ -71,7 +70,7 @@ class TaskService:
                 workspace = await self._workspace.prepare(spec, task.id)
                 task = task.evolve(workspace=workspace)
                 await self._store.update(task)
-                session_id = await self._runtime.start(task, build_task_prompt(spec))
+                session_id = await self._runtime.start(task)
                 task = task.transition(TaskState.RUNNING).evolve(
                     runtime_session_id=session_id
                 )

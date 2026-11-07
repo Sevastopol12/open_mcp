@@ -11,6 +11,26 @@ class API:
     ACTIVE_SESSIONS = "/api/session/active"
 
 
+def models() -> str:
+    return API.MODELS
+
+
+def skills() -> str:
+    return API.SKILLS
+
+
+def session_create() -> str:
+    return API.SESSIONS
+
+
+def experimental_session() -> str:
+    return API.EXPERIMENTAL_SESSIONS
+
+
+def active_session() -> str:
+    return API.ACTIVE_SESSIONS
+
+
 def _segment(session_id: str) -> str:
     return quote(session_id, safe="")
 
@@ -25,10 +45,6 @@ def session_interrupt(session_id: str) -> str:
 
 def session_wait(session_id: str) -> str:
     return f"{API.EXPERIMENTAL_SESSIONS}/{_segment(session_id)}/wait"
-
-
-def session_create() -> str:
-    return API.SESSIONS
 
 
 def session_get(session_id: str) -> str:
