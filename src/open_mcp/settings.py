@@ -31,7 +31,7 @@ class Settings(BaseModel):
     max_parallel_tasks: Annotated[int, Field(ge=1, le=32)] = 3
     connect_timeout_seconds: Annotated[float, Field(gt=0)] = 5.0
     request_timeout_seconds: Annotated[float, Field(gt=0)] = 60.0
-    wait_bound_seconds: Annotated[float, Field(gt=0)] = 30.0
+    wait_bound_seconds: Annotated[float, Field(gt=0)] = 600.0
     connect_retries: Annotated[int, Field(ge=0, le=5)] = 2
     retry_backoff_seconds: Annotated[float, Field(ge=0)] = 0.2
 
