@@ -27,7 +27,10 @@ class ModelCapabilities(BaseModel):
     ]
     temperature: Annotated[
         bool,
-        Field(description="Whether the model supports temperature configuration"),
+        Field(
+            default=None,
+            description="Whether the model supports temperature configuration",
+        ),
     ]
 
 
