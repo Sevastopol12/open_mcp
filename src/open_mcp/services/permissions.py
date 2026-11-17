@@ -1,3 +1,4 @@
+from asyncio import to_thread
 from pathlib import Path
 
 from open_mcp.contracts.runtime import PermissionRequest
@@ -8,7 +9,7 @@ class PermissionGate:
     async def decide(
         self, workspace: WorkspaceRef, request: PermissionRequest
     ) -> PermissionDecision:
-        root = Path(workspace.ref).resolve()
+        root = await to_thread(Path(workspace.ref).resolve)
         if not request.targets:
             return PermissionDecision(
                 allow=False, reason="request has no scoped targets"
@@ -17,7 +18,7 @@ class PermissionGate:
             path = Path(target)
             if not path.is_absolute():
                 path = root / path
-            resolved = path.resolve()
+            resolved = await to_thread(path.resolve)
             try:
                 resolved.relative_to(root)
             except ValueError:
