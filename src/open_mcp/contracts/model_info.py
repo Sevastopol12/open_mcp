@@ -122,8 +122,10 @@ class ModelInfo(BaseModel):
         Field(description="Model provider identifier"),
     ]
     type: Annotated[
-        str,
-        Field(description="Model type. Ex: chat, decision, image, string"),
+        str | None,
+        Field(
+            default=None, description="Model type. Ex: chat, decision, image, string"
+        ),
     ]
     name: Annotated[
         str,
